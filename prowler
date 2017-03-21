@@ -256,15 +256,29 @@ genCredReport
 saveReport
 
 check11(){
-  TITLE11="$BLUE 1.1$NORMAL Avoid the use of the root account (Scored). Last time root account was used
-     (password last used, access_key_1_last_used, access_key_2_last_used): "
+  TITLE11="$BLUE 1.1$NORMAL Avoid the use of the root account (Scored)."
+  DESC11="$BLUE Description:$NORMAL The "root" account has unrestricted access to all resources in the AWS account. It is highly
+recommended that the use of this account be avoided."
+  RATION11="$BLUE Rationale:$NORMAL The "root" account is the most privileged AWS account. Minimizing the use of this account
+and adopting the principle of least privilege for access management will reduce the risk of
+accidental changes and unintended disclosure of highly privileged credentials."
   COMMAND11=$(cat $TEMP_REPORT_FILE| grep '<root_account>' | cut -d, -f5,11,16 | sed 's/,/,\ /g')
   echo -e "\n$TITLE11"
-  echo -e "     $NOTICE $COMMAND11 $NORMAL"
+  echo -e "\n$DESC11"
+  echo -e "\n$RATION11\n"
+  echo -e "$BLUE Result:$NORMAL Last time root account was used (password last used, access_key_1_last_used, access_key_2_last_used): \n$NOTICE $COMMAND11 $NORMAL "
 }
 
 check12(){
   TITLE12="$BLUE 1.2$NORMAL Ensure multi-factor authentication (MFA) is enabled for all IAM users that have a console password (Scored)"
+  DESC12="$BLUE Description:$NORMAL Multi-Factor Authentication (MFA) adds an extra layer of protection on top of a user name
+and password. With MFA enabled, when a user signs in to an AWS website, they will be
+prompted for their user name and password as well as for an authentication code from
+their AWS MFA device. It is recommended that MFA be enabled for all accounts that have a
+console password."
+  RATION12="$BLUE Rationale:$NORMAL Enabling MFA provides increased security for console access as it requires the
+authenticating principal to possess a device that emits a time-sensitive key and have
+knowledge of a credential."
   # List users with password enabled
   COMMAND12_LIST_USERS_WITH_PASSWORD_ENABLED=$(cat $TEMP_REPORT_FILE|awk -F, '{ print $1,$4 }' |grep true | awk '{ print $1 }')
   COMMAND12=$(
@@ -272,17 +286,26 @@ check12(){
       cat $TEMP_REPORT_FILE|awk -F, '{ print $1,$8 }' |grep $i| grep false | awk '{ print $1 }'|tr '\n' ' ';
     done)
   echo -e "\n$TITLE12"
+  echo -e "\n$DESC12"
+  echo -e "\n$RATION12\n"
     if [[ $COMMAND12 ]]; then
-      echo -e "     List of users with Password enabled but MFA disabled:"
+      echo -e "BLUE Result:$NORMAL List of users with Password enabled but MFA disabled:"
       echo -e "     $RED $COMMAND12 $NORMAL"
     else
-      echo -e "     $OK OK! No users found with Password enabled and MFA disabled $NORMAL"
+      echo -e "$BLUE Result: $OK OK! No users found with Password enabled and MFA disabled $NORMAL"
     fi
 }
 
 check13(){
   TITLE13="$BLUE 1.3$NORMAL Ensure credentials unused for 90 days or greater are disabled (Scored)"
-  echo -e "\n$TITLE13 "
+  DESC13="$BLUE Description:$NORMAL AWS IAM users can access AWS resources using different types of credentials, such as
+passwords or access keys. It is recommended that all credentials that have been unused in
+90 or greater days be removed or deactivated."
+  RATION13="$BLUE Rationale:$NORMAL Disabling or removing unnecessary credentials will reduce the window of opportunity for
+credentials associated with a compromised or abandoned account to be used."
+  echo -e "\n$TITLE13"
+  echo -e "\n$DESC13"
+  echo -e "\n$RATION13\n"
   COMMAND12_LIST_USERS_WITH_PASSWORD_ENABLED=$(cat $TEMP_REPORT_FILE|awk -F, '{ print $1,$4 }' |grep true | awk '{ print $1 }')
   if [[ $COMMAND12_LIST_USERS_WITH_PASSWORD_ENABLED ]]; then
     COMMAND13=$(
@@ -297,23 +320,35 @@ check13(){
         DATEUSED=$($AWSCLI iam list-users --query "Users[?UserName=='$i'].PasswordLastUsed" --output text --profile $PROFILE --region $REGION | cut -d'T' -f1)
         HOWOLDER=$(how_older_from_today $DATEUSED)
         if [ $HOWOLDER -gt "90" ];then
-          echo "     $RED $i $NORMAL"
+          echo "$RED Result: $i $NORMAL"
         else
-          echo "     $OK OK! User \"$i\" found with unused credentials for 90 days or greater $NORMAL"
+          echo "$BLUE Result:$OK OK! User \"$i\" found with unused credentials for 90 days or greater $NORMAL"
         fi
       done
     fi
   else
-      echo "     $OK OK! No users found with password enabled $NORMAL"
+      echo "$BLUE Result:$OK OK! No users found with password enabled $NORMAL"
   fi
 
 }
 
 check14(){
   TITLE14="$BLUE 1.4$NORMAL Ensure access keys are rotated every 90 days or less (Scored)" # also checked by Security Monkey
+  DESC14="$BLUE Description:$NORMAL Access keys consist of an access key ID and secret access key, which are used to sign
+programmatic requests that you make to AWS. AWS users need their own access keys to
+make programmatic calls to AWS from the AWS Command Line Interface (AWS CLI), Tools
+for Windows PowerShell, the AWS SDKs, or direct HTTP calls using the APIs for individual
+AWS services. It is recommended that all access keys be regularly rotated."
+  RATION14="$BLUE Rationale:$NORMAL Rotating access keys will reduce the window of opportunity for an access key that is
+associated with a compromised or terminated account to be used.
+Access keys should be rotated to ensure that data cannot be accessed with an old key which
+might have been lost, cracked, or stolen."
   LIST_OF_USERS_WITH_ACCESS_KEY1=$(cat $TEMP_REPORT_FILE| awk -F, '{ print $1, $9 }' |grep "\ true" | awk '{ print $1 }')
   LIST_OF_USERS_WITH_ACCESS_KEY2=$(cat $TEMP_REPORT_FILE| awk -F, '{ print $1, $14 }' |grep "\ true" | awk '{ print $1 }')
   echo -e "\n$TITLE14 "
+  echo -e "\n$DESC14"
+  echo -e "\n$RATION14"
+  echo -e "\n$BLUE Result: $NORMAL\n"
     echo -e "     Users with access key 1 older than 90 days: "
     for user in $LIST_OF_USERS_WITH_ACCESS_KEY1; do
       # check access key 1
@@ -337,144 +372,248 @@ check14(){
 
 check15(){
   TITLE15="$BLUE 1.5$NORMAL Ensure IAM password policy requires at least one uppercase letter (Scored)"
+  DESC15="$BLUE Description:$NORMAL Password policies are, in part, used to enforce password complexity requirements. IAM
+password policies can be used to ensure password are comprised of different character
+sets. It is recommended that the password policy require at least one uppercase letter."
+  RATION15="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND15=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION --query 'PasswordPolicy.RequireUppercaseCharacters') # must be true
-  echo -e "\n$TITLE15 "
+  echo -e "\n$TITLE15"
+  echo -e "\n$DESC15"
+  echo -e "\n$RATION15\n"
+
   if [[ $COMMAND15 == "true" ]];then
-    echo -e "     $OK OK! $NORMAL"
+    echo -e "$BLUE Result:$OK OK! $NORMAL"
   else
-    echo -e "     $RED WARNING! $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! $NORMAL"
   fi
 }
 
 check16(){
   TITLE16="$BLUE 1.6$NORMAL Ensure IAM password policy require at least one lowercase letter (Scored)"
+  DESC16="$BLUE Description:$NORMAL Password policies are, in part, used to enforce password complexity requirements. IAM
+password policies can be used to ensure password are comprised of different character
+sets. It is recommended that the password policy require at least one lowercase letter."
+  RATION16="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND16=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION --query 'PasswordPolicy.RequireLowercaseCharacters') # must be true
-  echo -e "\n$TITLE16 "
+  echo -e "\n$TITLE16"
+  echo -e "\n$DESC16"
+  echo -e "\n$RATION16\n"
+
   if [[ $COMMAND16 == "true" ]];then
-    echo -e "     $OK OK! $NORMAL"
+    echo -e "$BLUE Result:$OK OK! $NORMAL"
   else
-    echo -e "     $RED WARNING! $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! $NORMAL"
   fi
 }
 
 check17(){
   TITLE17="$BLUE 1.7$NORMAL Ensure IAM password policy require at least one symbol (Scored)"
+  DESC17="$BLUE Description:$NORMAL Password policies are, in part, used to enforce password complexity requirements. IAM
+password policies can be used to ensure password are comprised of different character
+sets. It is recommended that the password policy require at least one symbol."
+  RATION17="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND17=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION --query 'PasswordPolicy.RequireSymbols') # must be true
-  echo -e "\n$TITLE17 "
+  echo -e "\n$TITLE17"
+  echo -e "\n$DESC17"
+  echo -e "\n$RATION17\n"
+
   if [[ $COMMAND17 == "true" ]];then
-    echo -e "     $OK OK! $NORMAL"
+    echo -e "$BLUE Result:$OK OK! $NORMAL"
   else
-    echo -e "     $RED WARNING! $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! $NORMAL"
   fi
 }
 
 check18(){
   TITLE18="$BLUE 1.8$NORMAL Ensure IAM password policy require at least one number (Scored)"
+  DESC18="$BLUE Description:$NORMAL Password policies are, in part, used to enforce password complexity requirements. IAM
+password policies can be used to ensure password are comprised of different character
+sets. It is recommended that the password policy require at least one number."
+  RATION18="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND18=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION --query 'PasswordPolicy.RequireNumbers') # must be true
-  echo -e "\n$TITLE18 "
+  echo -e "\n$TITLE18"
+  echo -e "\n$DESC18"
+  echo -e "\n$RATION18\n"
+
   if [[ $COMMAND18 == "true" ]];then
-    echo -e "     $OK OK! $NORMAL"
+    echo -e "$BLUE Result:$OK OK! $NORMAL"
   else
-    echo -e "     $RED WARNING! $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! $NORMAL"
   fi
 }
 
 check19(){
   TITLE19="$BLUE 1.9$NORMAL Ensure IAM password policy requires minimum length of 14 or greater (Scored)"
+  DESC19="$BLUE Description:$NORMAL Password policies are, in part, used to enforce password complexity requirements. IAM
+password policies can be used to ensure password are at least a given length. It is
+recommended that the password policy require a minimum password length 14."
+  RATION19="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND19=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION --query 'PasswordPolicy.MinimumPasswordLength')
-  echo -e "\n$TITLE19 "
+  echo -e "\n$TITLE19"
+  echo -e "\n$DESC19"
+  echo -e "\n$RATION19\n"
+
   if [[ $COMMAND19 -gt "13" ]];then
-    echo -e "     $OK OK! $NORMAL"
+    echo -e "$BLUE Result:$OK OK! $NORMAL"
   else
-    echo -e "     $RED WARNING! $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! $NORMAL"
   fi
 }
 
 check110(){
   TITLE110="$BLUE 1.10$NORMAL Ensure IAM password policy prevents password reuse (Scored)"
+  DESC110="$BLUE Description:$NORMAL IAM password policies can prevent the reuse of a given password by the same user. It is
+recommended that the password policy prevent the reuse of passwords."
+  RATION110="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND110=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION --query 'PasswordPolicy.PasswordReusePrevention' --output text)
-  echo -e "\n$TITLE110 "
+  echo -e "\n$TITLE110"
+  echo -e "\n$DESC110"
+  echo -e "\n$RATION110\n"
+
   if [[ $COMMAND110 ]];then
     if [[ $COMMAND110 -gt "23" ]];then
-      echo -e "     $OK OK! $NORMAL"
+      echo -e "$BLUE Result:$OK OK! $NORMAL"
     else
-      echo -e "     $RED WARNING! It is not set or it is set lower than 24 $NORMAL"
+      echo -e "$BLUE Result:$RED WARNING! It is not set or it is set lower than 24 $NORMAL"
     fi
   else
-    echo -e "     $RED WARNING! It is not set $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! It is not set $NORMAL"
   fi
 }
 
 check111(){
   TITLE111="$BLUE 1.11$NORMAL Ensure IAM password policy expires passwords within 90 days or less (Scored)"
+  DESC111="$BLUE Description:$NORMAL IAM password policies can require passwords to be rotated or expired after a given
+number of days. It is recommended that the password policy expire passwords after 90
+days or less."
+  RATION111="$BLUE Rationale:$NORMAL Setting a password complexity policy increases account resiliency against brute force login
+attempts."
   COMMAND111=$($AWSCLI iam get-account-password-policy --profile $PROFILE --region $REGION | grep MaxPasswordAge | awk -F: '{ print $2 }'|sed 's/\ //g'|sed 's/,/ /g')
-  echo -e "\n$TITLE111 "
+  echo -e "\n$TITLE111"
+  echo -e "\n$DESC111"
+  echo -e "\n$RATION111\n"
+
   if [[ $COMMAND111 ]];then
     if [ $COMMAND111 == "90" ];then
-      echo -e "     $OK OK! $NORMAL"
+      echo -e "$BLUE Result:$OK OK! $NORMAL"
     fi
   else
-    echo -e "     $RED WARNING! $NORMAL"
+    echo -e "$BLUE Result:$RED WARNING! $NORMAL"
   fi
 }
 
 check112(){
   TITLE112="$BLUE 1.12$NORMAL Ensure no root account access key exists (Scored)"
   # ensure the access_key_1_active and access_key_2_active fields are set to FALSE.
+  DESC112="$BLUE Description:$NORMAL The root account is the most privileged user in an AWS account. AWS Access Keys provide
+programmatic access to a given AWS account. It is recommended that all access keys
+associated with the root account be removed."
+  RATION112="$BLUE Rationale:$NORMAL Removing access keys associated with the root account limits vectors by which the account
+can be compromised. Additionally, removing the root access keys encourages the creation
+and use of role based accounts that are least privileged."
   ROOTKEY1=$(cat $TEMP_REPORT_FILE |grep root_account|awk -F',' '{ print $9 }')
   ROOTKEY2=$(cat $TEMP_REPORT_FILE |grep root_account|awk -F',' '{ print $14 }')
-  echo -e "\n$TITLE112 "
+  echo -e "\n$TITLE112"
+  echo -e "\n$DESC112"
+  echo -e "\n$RATION112\n"
+
   if [ $ROOTKEY1 == "false" ];then
-    echo -e "     $OK OK! $NORMAL No access key 1 found "
+    echo -e "$BLUE Result:$OK OK! $NORMAL No access key 1 found "
   else
-    echo -e "     $RED Found access key 1 $NORMAL"
+    echo -e "$BLUE Result:$RED Found access key 1 $NORMAL"
   fi
   if [ $ROOTKEY2 == "false" ];then
-    echo -e "     $OK OK! $NORMAL No access key 2 found "
+    echo -e "$BLUE Result:$OK OK! $NORMAL No access key 2 found "
   else
-    echo -e "     $RED Found access key 2 $NORMAL"
+    echo -e "$BLUE Result:$RED Found access key 2 $NORMAL"
   fi
 }
 
 check113(){
   TITLE113="$BLUE 1.13$NORMAL Ensure MFA is enabled for the root account (Scored)"
+  DESC113="$BLUE Description:$NORMAL The root account is the most privileged user in an AWS account. MFA adds an extra layer of
+protection on top of a user name and password. With MFA enabled, when a user signs in to
+an AWS website, they will be prompted for their user name and password as well as for an
+authentication code from their AWS MFA device."
+  RATION113="$BLUE Rationale:$NORMAL Enabling MFA provides increased security for console access as it requires the
+authenticating principal to possess a device that emits a time-sensitive key and have
+knowledge of a credential."
   COMMAND113=$($AWSCLI iam get-account-summary --profile $PROFILE --region $REGION |grep AccountMFAEnabled | awk -F': ' '{ print $2 }'|sed 's/,//')
   echo -e "\n$TITLE113"
+  echo -e "\n$DESC113"
+  echo -e "\n$RATION113\n"
+
   if [ $COMMAND113 == "1" ]; then
-    echo "     $OK OK! $NORMAL Virtual MFA is enabled. "
+    echo "$BLUE Result:$OK OK! $NORMAL Virtual MFA is enabled. "
   else
-    echo "     $RED WARNING! MFA is not ENABLED for root account $NORMAL"
+    echo "$BLUE Result:$RED WARNING! MFA is not ENABLED for root account $NORMAL"
   fi
 }
 
 check114(){
   TITLE114="$BLUE 1.14$NORMAL Ensure hardware MFA is enabled for the root account (Scored)"
+  DESC114="$BLUE Description:$NORMAL The root account is the most privileged user in an AWS account. MFA adds an extra layer of
+protection on top of a user name and password. With MFA enabled, when a user signs in to
+an AWS website, they will be prompted for their user name and password as well as for an
+authentication code from their AWS MFA device. For Level 2, it is recommended that the
+root account be protected with a hardware MFA."
+  RATION114="$BLUE Rationale:$NORMAL A hardware MFA has a smaller attack surface than a virtual MFA. For example, a hardware
+MFA does not suffer the attack surface introduced by the mobile smartphone on which a
+virtual MFA resides."
   COMMAND113=$($AWSCLI iam get-account-summary --profile $PROFILE --region $REGION |grep AccountMFAEnabled | awk -F': ' '{ print $2 }'|sed 's/,//')
   echo -e "\n$TITLE114"
+  echo -e "\n$DESC114"
+  echo -e "\n$RATION114\n"
+
   if [ $COMMAND113 == "1" ]; then
     COMMAND114=$($AWSCLI iam list-virtual-mfa-devices --profile $PROFILE --region $REGION --query 'VirtualMFADevices' --output text|grep :root |wc -l)
     if [ $COMMAND114 == "1" ]; then
-      echo "     $OK OK! $NORMAL Virtual MFA is enabled. "
+      echo "$BLUE Result:$OK OK! $NORMAL Virtual MFA is enabled. "
     else
-      echo "     $OK OK! $NORMAL Hardware MFA is enabled. "
+      echo "$BLUE Result:$OK OK! $NORMAL Hardware MFA is enabled. "
     fi
   else
-    echo "     $RED WARNING! MFA is not ENABLED for root account $NORMAL"
+    echo "$BLUE Result:$RED WARNING! MFA is not ENABLED for root account $NORMAL"
   fi
 }
 
 check115(){
   TITLE115="$BLUE 1.15$NORMAL Ensure security questions are registered in the AWS account (Not Scored)"
   # No command available
+  DESC115="$BLUE Description:$NORMAL The AWS support portal allows account owners to establish security questions that can be
+used to authenticate individuals calling AWS customer service for support. It is
+recommended that security questions be established."
+  RATION115="$BLUE Rationale:$NORMAL When creating a new AWS account, a default super user is automatically created. This
+account is referred to as the "root" account. It is recommended that the use of this account
+be limited and highly controlled. During events in which the Root password is no longer
+accessible or the MFA token associated with root is lost/destroyed it is possible, through
+authentication using secret questions and associated answers, to recover root login access."
   echo -e "\n$TITLE115"
-  echo -e "     $NOTICE No command available for check 1.14"
+  echo -e "\n$DESC115"
+  echo -e "\n$RATION115\n"
+  echo -e "     $NOTICE No command available for check 1.15"
   echo -e "      Login to the AWS Console as root, click on the Account "
   echo -e "      Name -> My Account -> Configure Security Challenge Questions $NORMAL"
 }
 
 check116(){
-  TITLE115="$BLUE 1.16$NORMAL Ensure IAM policies are attached only to groups or roles (Scored)"
+  TITLE116="$BLUE 1.16$NORMAL Ensure IAM policies are attached only to groups or roles (Scored)"
+  DESC116="$BLUE Description:$NORMAL By default, IAM users, groups, and roles have no access to AWS resources. IAM policies are
+the means by which privileges are granted to users, groups, or roles. It is recommended
+that IAM policies be applied directly to groups and roles but not users."
+  RATION116="$BLUE Rationale:$NORMAL Assigning privileges at the group or role level reduces the complexity of access
+management as the number of users grow. Reducing access management complexity may
+in-turn reduce opportunity for a principal to inadvertently receive or retain excessive
+privileges."
   echo -e "\n$TITLE116"
+  echo -e "\n$DESC116"
+  echo -e "\n$RATION116\n"
   LIST_USERS=$($AWSCLI iam list-users --query 'Users[*].UserName' --output text --profile $PROFILE --region $REGION)
   echo -e "      Users with policy attached to them instead to groups: (it may take few seconds...) "
   for user in $LIST_USERS;do
